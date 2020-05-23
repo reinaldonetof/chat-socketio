@@ -19,8 +19,19 @@ app.use(
 
 app.get("/", (req, res) => res.render("home"));
 app.post("/", (req, res) => {
-  console.log(req.body);
-  res.send("ok");
+  req.session.user = {
+    name: req.body.name,
+  };
+  res.redirect("/room");
+});
+
+app.get("/room", (req, res) => {
+  if (!req.session.user) {
+    res.redirect("/");
+  }
+  res.render("room", {
+    name: req.session.user.name,
+  });
 });
 
 mongoose
