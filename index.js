@@ -80,8 +80,18 @@ io.on("connection", (socket) => {
     message.save().then(() => {
       io.to(msg.room).emit("newMsg", message);
     });
-    console.log(msg);
-    console.log(socket.handshake.session);
+  });
+  socket.on("sendAudio", (msg) => {
+    const message = new Message({
+      author: socket.handshake.session.user.name,
+      when: new Date(),
+      type: "audio",
+      message: msg.data,
+      room: msg.room,
+    });
+    message.save().then(() => {
+      io.to(msg.room).emit("newAudio", message);
+    });
   });
 });
 

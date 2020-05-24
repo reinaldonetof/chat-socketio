@@ -102,22 +102,48 @@
 
         let selectedRoom = "";
 
-        let audioStream;
+        let mediaRecorder;
         let audioPermission = false;
         navigator.mediaDevices.getUserMedia({ audio: true }).then(
           (stream) => {
             audioPermission = true;
-            audioStream = stream;
+            mediaRecorder = new MediaRecorder(stream);
+            let chunks = [];
+            mediaRecorder.ondataavailable = (data) => {
+              // data received
+              chunks.push(data.data);
+            };
+            mediaRecorder.onstop = () => {
+              // data stopped
+              const reader = new window.FileReader();
+              const blob = new Blob(chunks, { type: "audio/ogg; codec=opus" });
+              reader.readAsDataURL(blob);
+              reader.onloadend = () => {
+                socket.emit("sendAudio", {
+                  data: reader.result,
+                  room: selectedRoom,
+                });
+              };
+              chunks = [];
+            };
           },
           (err) => {
-            audioStream = null;
+            mediaRecorder = null;
             audioPermission = false;
           }
         );
 
         $(".send-audio")
-          .mouseup(function () {})
-          .mousedown(function () {});
+          .mouseup(function () {
+            if (audioPermission) {
+              mediaRecorder.stop();
+            }
+          })
+          .mousedown(function () {
+            if (audioPermission && selectedRoom !== "") {
+              mediaRecorder.start();
+            }
+          });
 
         $(".msg").keyup(function (key) {
           if (selectedRoom !== "" && key.keyCode === 13) {
@@ -142,10 +168,20 @@
           );
         };
 
+        const renderMsg = (type, msg) => {
+          if (type === "text") {
+            return msg;
+          } else if (type === "audio") {
+            return `
+            <audio src="${msg}" controls="true"></audio>
+            `;
+          }
+          return "";
+        };
         const addMsg = (msg) => {
           const html = `<div class="message">
             <span class="author"> ${msg.author} </span><br />
-            <span class="msg-body"> ${msg.message} </span>
+            <span class="msg-body"> ${renderMsg(msg.type, msg.message)} </span>
           </div>`;
 
           $(".messages").append(html);
@@ -164,6 +200,13 @@
         socket.on("newMsg", (msg) => {
           if (selectedRoom === msg.room) addMsg(msg);
           else {
+            // atualizar contador de msgs nao lidas
+          }
+        });
+        socket.on("newAudio", (msg) => {
+          if (selectedRoom === msg.room) {
+            addMsg(msg);
+          } else {
             // atualizar contador de msgs nao lidas
           }
         });
