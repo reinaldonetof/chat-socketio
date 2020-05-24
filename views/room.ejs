@@ -67,18 +67,12 @@
       <div class="room">
         <div class="messages">
           <div class="message">
-            <span class="author">Tulio Faria</span><br /><span class="msg-body"
-              >Mensagem aqui</span
-            >
+            <span class="author"> Tulio Faria </span><br />
+            <span class="msg-body"> Mensagem aqui </span>
           </div>
         </div>
         <div class="new-message-form w-form">
-          <form
-            id="email-form"
-            name="email-form"
-            data-name="Email Form"
-            class="form"
-          >
+          <form class="form">
             <textarea
               id="field"
               name="field"
@@ -86,8 +80,9 @@
               placeholder="Digite sua mensagem e pressione &lt;Enter&gt;"
               autofocus="true"
               class="msg w-input"
-            ></textarea
-            ><a href="#" class="send-audio w-button">Enviar<br />Áudio</a>
+            >
+            </textarea>
+            <a href="#" class="send-audio w-button"> Enviar<br />Áudio</a>
           </form>
           <div class="w-form-done">
             <div>Thank you! Your submission has been received!</div>
@@ -104,5 +99,72 @@
     ></script>
     <script src="js/webflow.js" type="text/javascript"></script>
     <!-- [if lte IE 9]><script src="https://cdnjs.cloudflare.com/ajax/libs/placeholders/3.0.2/placeholders.min.js"></script><![endif] -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      $(function () {
+        const socket = io();
+
+        let selectedRoom = "";
+
+        $(".msg").keyup(function (key) {
+          if (selectedRoom !== "" && key.keyCode === 13) {
+            //enviar mensagem no enter
+            socket.emit("sendMsg", {
+              msg: $(".msg").val(),
+              room: selectedRoom,
+            });
+            $(".msg").val("");
+          }
+        });
+
+        $(".room-list").on("click", ".room-item", function () {
+          const roomId = $(this).attr("data-id");
+          socket.emit("join", roomId);
+          selectedRoom = roomId;
+        });
+
+        const addRoom = (id, roomName) => {
+          $(".room-list").append(
+            `<li data-id="${id}" class="room-item"> ${roomName} <span class="notifications">(2)</span> </li>`
+          );
+        };
+
+        const addMsg = (msg) => {
+          const html = `<div class="message">
+            <span class="author"> ${msg.author} </span><br />
+            <span class="msg-body"> ${msg.message} </span>
+          </div>`;
+
+          $(".messages").append(html);
+        };
+        // recebe uma nova sala
+        socket.on("newRoom", (room) => {
+          addRoom(room._id, room.name);
+        });
+        // recebe a lista inicial de rooms
+        socket.on("roomList", (rooms) => {
+          $(".room-list").html("");
+          rooms.map((room) => {
+            addRoom(room._id, room.name);
+          });
+        });
+        socket.on("newMsg", (msg) => {
+          if (selectedRoom === msg.room) addMsg(msg);
+          else {
+            // atualizar contador de msgs nao lidas
+          }
+        });
+        socket.on("msgsList", (msgs) => {
+          $(".messages").html("");
+          msgs.map(addMsg);
+        });
+        $(".add-room").click(function () {
+          const roomName = prompt("Informe o nome da sala");
+          if (roomName) {
+            socket.emit("addRoom", roomName);
+          }
+        });
+      });
+    </script>
   </body>
 </html>
