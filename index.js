@@ -1,6 +1,12 @@
 const session = require("express-session");
 const express = require("express");
 const app = express();
+const http = require("http").Server(app);
+const io = require("socket.io")(http);
+const sharedSession = require("express-socket.io-session");
+
+const Room = require("./models/room");
+const Message = require("./models/message");
 
 const mongoose = require("mongoose");
 mongoose.Promise = global.Promise;
@@ -8,14 +14,23 @@ mongoose.Promise = global.Promise;
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 app.set("view engine", "ejs");
-app.use(
-  session({
-    secret: "socketio",
-    cookie: {
-      maxAge: 10 * 60 * 1000,
-    },
-  })
-);
+
+const expressSession = session({
+  secret: "socketio",
+  cookie: {
+    maxAge: 10 * 60 * 1000,
+  },
+});
+app.use(expressSession);
+io.use(sharedSession(expressSession, { autoSave: true }));
+io.use((socket, next) => {
+  const session = socket.handshake.session;
+  if (!session.user) {
+    next(new Error("Auth failed."));
+  } else {
+    next();
+  }
+});
 
 app.get("/", (req, res) => res.render("home"));
 app.post("/", (req, res) => {
@@ -27,10 +42,46 @@ app.post("/", (req, res) => {
 
 app.get("/room", (req, res) => {
   if (!req.session.user) {
-    res.redirect("/");
+    return res.redirect("/");
   }
   res.render("room", {
     name: req.session.user.name,
+  });
+});
+
+io.on("connection", (socket) => {
+  Room.find({}, (err, rooms) => {
+    socket.emit("roomList", rooms);
+  });
+  socket.on("addRoom", (roomName) => {
+    const room = new Room({
+      name: roomName,
+    });
+    room.save().then(() => {
+      io.emit("newRoom", room);
+    });
+  });
+  // join na sala que o usuario quer entrar
+  socket.on("join", (roomId) => {
+    socket.join(roomId);
+    Message.find({ room: roomId }).then((msgs) => {
+      socket.emit("msgsList", msgs);
+    });
+  });
+  // receber mensagem
+  socket.on("sendMsg", (msg) => {
+    const message = new Message({
+      author: socket.handshake.session.user.name,
+      when: new Date(),
+      type: "text",
+      message: msg.msg,
+      room: msg.room,
+    });
+    message.save().then(() => {
+      io.to(msg.room).emit("newMsg", message);
+    });
+    console.log(msg);
+    console.log(socket.handshake.session);
   });
 });
 
@@ -40,5 +91,5 @@ mongoose
     useUnifiedTopology: true,
   })
   .then(() => {
-    app.listen(3000, () => console.log("Chat runing..."));
+    http.listen(3000, () => console.log("Chat runing..."));
   });
