@@ -160,12 +160,15 @@
           const roomId = $(this).attr("data-id");
           socket.emit("join", roomId);
           selectedRoom = roomId;
+          $(`#${roomId} .notifications`).show();
+          $(`#${roomId} .notifications span`).text("0");
         });
 
         const addRoom = (id, roomName) => {
           $(".room-list").append(
-            `<li data-id="${id}" class="room-item"> ${roomName} <span class="notifications">(2)</span> </li>`
+            `<li id="${id}" data-id="${id}" class="room-item"> ${roomName} <span class="notifications">(<span>0</span>)</span> </li>`
           );
+          $(`#${id} .notifications`).hide();
         };
 
         const renderMsg = (type, msg) => {
@@ -201,6 +204,10 @@
           if (selectedRoom === msg.room) addMsg(msg);
           else {
             // atualizar contador de msgs nao lidas
+            const id = msg.room;
+            let count = parseInt($(`#${id} .notifications span`).text());
+            count++;
+            $(`#${id} .notifications span`).text(count);
           }
         });
         socket.on("newAudio", (msg) => {
