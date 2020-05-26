@@ -4,12 +4,16 @@ const app = express();
 const http = require("http").Server(app);
 const io = require("socket.io")(http);
 const sharedSession = require("express-socket.io-session");
+const redis = require("socket.io-redis");
+io.adapter(redis());
 
 const Room = require("./models/room");
 const Message = require("./models/message");
 
 const mongoose = require("mongoose");
 mongoose.Promise = global.Promise;
+
+const port = process.env.PORT || 3000;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
@@ -101,5 +105,5 @@ mongoose
     useUnifiedTopology: true,
   })
   .then(() => {
-    http.listen(3000, () => console.log("Chat runing..."));
+    http.listen(port, () => console.log("Chat runing..."));
   });
